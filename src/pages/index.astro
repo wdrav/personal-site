@@ -1,0 +1,180 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="William — Developer & Data Analyst">
+  <!-- Navigation -->
+  <nav>
+    <div class="container">
+      <a href="/" class="logo">william.</a>
+      <ul class="nav-links">
+        <li><a href="#about">About</a></li>
+        <li><a href="#blog">Blog</a></li>
+        <li><a href="#projects">Projects</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- About / Hero -->
+  <section class="hero" id="about">
+    <div class="container">
+      <div class="hero-content">
+        <p class="label">Hello, I'm</p>
+        <h1>
+          William
+          <br />
+          <span>Developer & Data Analyst</span>
+        </h1>
+        <p class="bio">
+          CS graduate who pivoted into data analytics. I spend my days writing
+          SQL to clean and transform data, and I'm getting back into
+          programming to build things that interest me.
+        </p>
+        <div class="links">
+          <a href="https://github.com/" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://linkedin.com/" target="_blank" rel="noopener">LinkedIn</a>
+          <a href="mailto:your@email.com">Email</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Blog -->
+  <section id="blog">
+    <div class="container">
+      <div class="section-header">
+        <h2>Blog</h2>
+      </div>
+
+      <div class="blog-grid">
+        <article class="blog-card">
+          <p class="date">2026-02-10</p>
+          <h3><a href="#">Getting Back Into Programming</a></h3>
+          <p>
+            After spending a couple years deep in SQL and data pipelines,
+            I'm picking up general-purpose programming again. Here's my plan.
+          </p>
+          <div class="tags">
+            <span class="tag">career</span>
+            <span class="tag">programming</span>
+          </div>
+        </article>
+
+        <article class="blog-card">
+          <p class="date">2026-01-25</p>
+          <h3><a href="#">SQL Patterns I Use Every Day</a></h3>
+          <p>
+            A rundown of the CTEs, window functions, and transformation
+            patterns that make up most of my daily work in data analytics.
+          </p>
+          <div class="tags">
+            <span class="tag">sql</span>
+            <span class="tag">data</span>
+          </div>
+        </article>
+
+        <article class="blog-card">
+          <p class="date">2026-01-12</p>
+          <h3><a href="#">Why I Chose Astro for This Site</a></h3>
+          <p>
+            Static sites don't need React. A look at why Astro is a great
+            fit for personal sites and blogs.
+          </p>
+          <div class="tags">
+            <span class="tag">astro</span>
+            <span class="tag">web</span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Projects -->
+  <section id="projects">
+    <div class="container">
+      <div class="section-header">
+        <h2>Projects</h2>
+      </div>
+
+      <div class="projects-grid">
+        <div class="project-card">
+          <p class="project-label">Data Pipeline</p>
+          <h3>Sales Data ETL</h3>
+          <p>
+            An ETL pipeline that ingests raw sales CSVs, cleans and
+            normalizes the data with SQL, and outputs analysis-ready
+            tables.
+          </p>
+          <div class="tech">
+            <span>SQL</span>
+            <span>Python</span>
+            <span>PostgreSQL</span>
+          </div>
+          <div class="project-links">
+            <a href="#" target="_blank" rel="noopener">Source</a>
+          </div>
+        </div>
+
+        <div class="project-card">
+          <p class="project-label">Web App</p>
+          <h3>Budget Tracker</h3>
+          <p>
+            A simple web app for tracking monthly expenses. Built to
+            practice full-stack development outside of my day-to-day
+            data work.
+          </p>
+          <div class="tech">
+            <span>JavaScript</span>
+            <span>Node.js</span>
+            <span>SQLite</span>
+          </div>
+          <div class="project-links">
+            <a href="#" target="_blank" rel="noopener">Source</a>
+            <a href="#" target="_blank" rel="noopener">Live</a>
+          </div>
+        </div>
+
+        <div class="project-card">
+          <p class="project-label">Analysis</p>
+          <h3>Churn Analysis</h3>
+          <p>
+            Exploratory analysis of customer churn data, identifying key
+            predictors and visualizing retention cohorts.
+          </p>
+          <div class="tech">
+            <span>SQL</span>
+            <span>Python</span>
+            <span>Pandas</span>
+          </div>
+          <div class="project-links">
+            <a href="#" target="_blank" rel="noopener">Source</a>
+          </div>
+        </div>
+
+        <div class="project-card">
+          <p class="project-label">Tooling</p>
+          <h3>CSV Cleaner CLI</h3>
+          <p>
+            A command-line tool that automates common CSV cleaning tasks:
+            deduplication, type coercion, null handling, and column
+            renaming.
+          </p>
+          <div class="tech">
+            <span>Python</span>
+            <span>Click</span>
+          </div>
+          <div class="project-links">
+            <a href="#" target="_blank" rel="noopener">Source</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <p>&copy; {new Date().getFullYear()} William. Built with Astro.</p>
+    </div>
+  </footer>
+</Layout>
