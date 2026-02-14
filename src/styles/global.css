@@ -12,9 +12,9 @@
   --bg-surface: #12121a;
   --text: #e8e8ec;
   --text-muted: #8888a0;
-  --accent: #6c63ff;
-  --accent-dim: rgba(108, 99, 255, 0.15);
-  --accent-glow: rgba(108, 99, 255, 0.08);
+  --accent: #5ebbf7;
+  --accent-dim: rgba(94, 187, 247, 0.15);
+  --accent-glow: rgba(94, 187, 247, 0.08);
   --line: rgba(255, 255, 255, 0.06);
   --line-bright: rgba(255, 255, 255, 0.12);
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
@@ -138,8 +138,8 @@ a:hover {
     55deg,
     transparent,
     transparent 120px,
-    rgba(108, 99, 255, 0.03) 120px,
-    rgba(108, 99, 255, 0.03) 121px
+    rgba(94, 187, 247, 0.03) 120px,
+    rgba(94, 187, 247, 0.03) 121px
   );
 }
 
@@ -474,7 +474,7 @@ nav .nav-links a:hover::after {
 }
 
 .blog-card:hover .tag {
-  background: rgba(108, 99, 255, 0.25);
+  background: rgba(94, 187, 247, 0.25);
 }
 
 /* ===== Projects Section ===== */
@@ -566,7 +566,7 @@ nav .nav-links a:hover::after {
 }
 
 .project-card:hover .tech span {
-  border-color: rgba(108, 99, 255, 0.3);
+  border-color: rgba(94, 187, 247, 0.3);
   color: var(--text);
 }
 
@@ -589,6 +589,41 @@ nav .nav-links a:hover::after {
   color: var(--accent);
   opacity: 1;
   transform: translateX(4px);
+}
+
+/* ===== Coming Soon Placeholder ===== */
+.coming-soon {
+  border: 1px dashed var(--line-bright);
+  border-radius: 4px;
+  padding: 3.5rem 2.5rem;
+  text-align: center;
+}
+
+.coming-soon-title {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  color: var(--accent);
+  margin-bottom: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.coming-soon-text {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.coming-soon-text a {
+  color: var(--accent);
+  border-bottom: 1px solid var(--line);
+  transition: border-color 0.3s;
+}
+
+.coming-soon-text a:hover {
+  border-color: var(--accent);
+  opacity: 1;
 }
 
 /* ===== Footer ===== */
