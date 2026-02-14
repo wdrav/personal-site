@@ -19,35 +19,39 @@ import Layout from "../layouts/Layout.astro";
   <section class="hero" id="about">
     <div class="container">
       <div class="hero-content">
-        <p class="label">Hello, I'm</p>
-        <h1>
+        <p class="label reveal">Hello, I'm</p>
+        <h1 class="reveal">
           William
           <br />
           <span>Developer & Data Analyst</span>
         </h1>
-        <p class="bio">
+        <p class="bio reveal">
           CS graduate who pivoted into data analytics. I spend my days writing
           SQL to clean and transform data, and I'm getting back into
           programming to build things that interest me.
         </p>
-        <div class="links">
+        <div class="links reveal">
           <a href="https://github.com/" target="_blank" rel="noopener">GitHub</a>
           <a href="https://linkedin.com/" target="_blank" rel="noopener">LinkedIn</a>
           <a href="mailto:your@email.com">Email</a>
         </div>
       </div>
     </div>
+    <div class="scroll-indicator">
+      <span>Scroll</span>
+      <div class="arrow"></div>
+    </div>
   </section>
 
   <!-- Blog -->
   <section id="blog">
     <div class="container">
-      <div class="section-header">
+      <div class="section-header reveal">
         <h2>Blog</h2>
       </div>
 
-      <div class="blog-grid">
-        <article class="blog-card">
+      <div class="blog-grid stagger">
+        <article class="blog-card reveal">
           <p class="date">2026-02-10</p>
           <h3><a href="#">Getting Back Into Programming</a></h3>
           <p>
@@ -60,7 +64,7 @@ import Layout from "../layouts/Layout.astro";
           </div>
         </article>
 
-        <article class="blog-card">
+        <article class="blog-card reveal">
           <p class="date">2026-01-25</p>
           <h3><a href="#">SQL Patterns I Use Every Day</a></h3>
           <p>
@@ -73,7 +77,7 @@ import Layout from "../layouts/Layout.astro";
           </div>
         </article>
 
-        <article class="blog-card">
+        <article class="blog-card reveal">
           <p class="date">2026-01-12</p>
           <h3><a href="#">Why I Chose Astro for This Site</a></h3>
           <p>
@@ -92,12 +96,12 @@ import Layout from "../layouts/Layout.astro";
   <!-- Projects -->
   <section id="projects">
     <div class="container">
-      <div class="section-header">
+      <div class="section-header reveal">
         <h2>Projects</h2>
       </div>
 
-      <div class="projects-grid">
-        <div class="project-card">
+      <div class="projects-grid stagger">
+        <div class="project-card reveal">
           <p class="project-label">Data Pipeline</p>
           <h3>Sales Data ETL</h3>
           <p>
@@ -115,7 +119,7 @@ import Layout from "../layouts/Layout.astro";
           </div>
         </div>
 
-        <div class="project-card">
+        <div class="project-card reveal">
           <p class="project-label">Web App</p>
           <h3>Budget Tracker</h3>
           <p>
@@ -134,7 +138,7 @@ import Layout from "../layouts/Layout.astro";
           </div>
         </div>
 
-        <div class="project-card">
+        <div class="project-card reveal">
           <p class="project-label">Analysis</p>
           <h3>Churn Analysis</h3>
           <p>
@@ -151,7 +155,7 @@ import Layout from "../layouts/Layout.astro";
           </div>
         </div>
 
-        <div class="project-card">
+        <div class="project-card reveal">
           <p class="project-label">Tooling</p>
           <h3>CSV Cleaner CLI</h3>
           <p>
@@ -172,9 +176,28 @@ import Layout from "../layouts/Layout.astro";
   </section>
 
   <!-- Footer -->
-  <footer>
+  <footer class="reveal">
     <div class="container">
       <p>&copy; {new Date().getFullYear()} William. Built with Astro.</p>
     </div>
   </footer>
 </Layout>
+
+<script>
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.15, rootMargin: "0px 0px -40px 0px" }
+  );
+
+  document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
+
+  // Also observe section-headers for the line animation
+  document.querySelectorAll(".section-header").forEach((el) => observer.observe(el));
+</script>

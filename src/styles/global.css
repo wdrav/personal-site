@@ -14,6 +14,7 @@
   --text-muted: #8888a0;
   --accent: #6c63ff;
   --accent-dim: rgba(108, 99, 255, 0.15);
+  --accent-glow: rgba(108, 99, 255, 0.08);
   --line: rgba(255, 255, 255, 0.06);
   --line-bright: rgba(255, 255, 255, 0.12);
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
@@ -42,6 +43,33 @@ a:hover {
   opacity: 0.8;
 }
 
+/* ===== Scroll Reveal System ===== */
+.reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger children */
+.stagger > .reveal:nth-child(1) { transition-delay: 0s; }
+.stagger > .reveal:nth-child(2) { transition-delay: 0.1s; }
+.stagger > .reveal:nth-child(3) { transition-delay: 0.2s; }
+.stagger > .reveal:nth-child(4) { transition-delay: 0.3s; }
+.stagger > .reveal:nth-child(5) { transition-delay: 0.4s; }
+.stagger > .reveal:nth-child(6) { transition-delay: 0.5s; }
+
+/* Hero stagger — different timing for the hero children */
+.hero-content > .reveal:nth-child(1) { transition-delay: 0.1s; }
+.hero-content > .reveal:nth-child(2) { transition-delay: 0.25s; }
+.hero-content > .reveal:nth-child(3) { transition-delay: 0.4s; }
+.hero-content > .reveal:nth-child(4) { transition-delay: 0.55s; }
+
 /* ===== Decorative Line Pattern Background ===== */
 .line-pattern {
   position: fixed;
@@ -51,7 +79,6 @@ a:hover {
   overflow: hidden;
 }
 
-/* Diagonal lines - top left to bottom right */
 .line-pattern::before {
   content: "";
   position: absolute;
@@ -67,7 +94,6 @@ a:hover {
   );
 }
 
-/* Horizontal accent lines */
 .line-pattern::after {
   content: "";
   position: absolute;
@@ -81,7 +107,6 @@ a:hover {
   );
 }
 
-/* Vertical accent lines via a child element */
 .line-pattern-v {
   position: fixed;
   inset: 0;
@@ -102,7 +127,6 @@ a:hover {
   );
 }
 
-/* Cross-hatch accent in the hero area */
 .line-pattern-v::after {
   content: "";
   position: absolute;
@@ -147,6 +171,12 @@ nav {
   background: rgba(10, 10, 15, 0.85);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);
+  transform: translateY(-100%);
+  animation: nav-slide-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+}
+
+@keyframes nav-slide-in {
+  to { transform: translateY(0); }
 }
 
 nav .container {
@@ -174,12 +204,28 @@ nav .nav-links a {
   font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  transition: color 0.2s;
+  transition: color 0.3s;
+  position: relative;
+}
+
+nav .nav-links a::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--accent);
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 nav .nav-links a:hover {
   color: var(--text);
   opacity: 1;
+}
+
+nav .nav-links a:hover::after {
+  width: 100%;
 }
 
 /* ===== Hero / About Section ===== */
@@ -188,6 +234,7 @@ nav .nav-links a:hover {
   display: flex;
   align-items: center;
   padding-top: 5rem;
+  position: relative;
 }
 
 .hero-content {
@@ -247,13 +294,64 @@ nav .nav-links a:hover {
   letter-spacing: 0.05em;
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--line);
-  transition: color 0.2s, border-color 0.2s;
+  transition: color 0.3s, border-color 0.3s, transform 0.3s;
 }
 
 .hero .links a:hover {
   color: var(--text);
-  border-color: var(--text-muted);
+  border-color: var(--accent);
   opacity: 1;
+  transform: translateY(-2px);
+}
+
+/* Scroll indicator */
+.scroll-indicator {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  opacity: 0;
+  animation: fade-in 1s ease 1.2s forwards;
+}
+
+.scroll-indicator span {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+.scroll-indicator .arrow {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(to bottom, var(--accent), transparent);
+  position: relative;
+  overflow: hidden;
+}
+
+.scroll-indicator .arrow::after {
+  content: "";
+  position: absolute;
+  top: -40px;
+  left: 0;
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, var(--text));
+  animation: scroll-line 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes scroll-line {
+  0% { top: -40px; }
+  100% { top: 40px; }
+}
+
+@keyframes fade-in {
+  to { opacity: 1; }
 }
 
 /* ===== Section Headers ===== */
@@ -278,6 +376,13 @@ nav .nav-links a:hover {
   flex: 1;
   height: 1px;
   background: var(--line-bright);
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: transform 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s;
+}
+
+.section-header.visible::after {
+  transform: scaleX(1);
 }
 
 /* ===== Blog Section ===== */
@@ -286,16 +391,37 @@ nav .nav-links a:hover {
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .blog-card {
   background: var(--bg);
   padding: 2rem;
-  transition: background 0.2s;
+  transition: background 0.4s, box-shadow 0.4s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.blog-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .blog-card:hover {
   background: var(--bg-surface);
+  box-shadow: inset 0 0 60px var(--accent-glow);
+}
+
+.blog-card:hover::before {
+  transform: scaleY(1);
 }
 
 .blog-card .date {
@@ -315,10 +441,12 @@ nav .nav-links a:hover {
 
 .blog-card h3 a {
   color: var(--text);
+  transition: color 0.3s;
 }
 
 .blog-card h3 a:hover {
   color: var(--accent);
+  opacity: 1;
 }
 
 .blog-card p {
@@ -342,6 +470,11 @@ nav .nav-links a:hover {
   padding: 0.2rem 0.6rem;
   border-radius: 2px;
   letter-spacing: 0.03em;
+  transition: background 0.3s;
+}
+
+.blog-card:hover .tag {
+  background: rgba(108, 99, 255, 0.25);
 }
 
 /* ===== Projects Section ===== */
@@ -351,6 +484,8 @@ nav .nav-links a:hover {
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .project-card {
@@ -358,11 +493,31 @@ nav .nav-links a:hover {
   padding: 2rem;
   display: flex;
   flex-direction: column;
-  transition: background 0.2s;
+  transition: background 0.4s, box-shadow 0.4s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.project-card::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .project-card:hover {
   background: var(--bg-surface);
+  box-shadow: inset 0 0 60px var(--accent-glow);
+  transform: translateY(-4px);
+}
+
+.project-card:hover::after {
+  transform: scaleX(1);
 }
 
 .project-card .project-label {
@@ -372,6 +527,11 @@ nav .nav-links a:hover {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin-bottom: 1rem;
+  transition: color 0.3s;
+}
+
+.project-card:hover .project-label {
+  color: var(--accent);
 }
 
 .project-card h3 {
@@ -402,6 +562,12 @@ nav .nav-links a:hover {
   border: 1px solid var(--line-bright);
   padding: 0.2rem 0.6rem;
   border-radius: 2px;
+  transition: border-color 0.3s, color 0.3s;
+}
+
+.project-card:hover .tech span {
+  border-color: rgba(108, 99, 255, 0.3);
+  color: var(--text);
 }
 
 .project-card .project-links {
@@ -416,12 +582,13 @@ nav .nav-links a:hover {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--text-muted);
-  transition: color 0.2s;
+  transition: color 0.3s, transform 0.3s;
 }
 
 .project-card .project-links a:hover {
   color: var(--accent);
   opacity: 1;
+  transform: translateX(4px);
 }
 
 /* ===== Footer ===== */
@@ -462,7 +629,38 @@ footer p {
     padding-bottom: 4rem;
   }
 
+  .scroll-indicator {
+    display: none;
+  }
+
   .projects-grid {
     grid-template-columns: 1fr;
+  }
+
+  .project-card:hover {
+    transform: none;
+  }
+}
+
+/* ===== Reduced motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  nav {
+    transform: none;
+    animation: none;
+  }
+
+  .scroll-indicator {
+    animation: none;
+    opacity: 1;
+  }
+
+  .scroll-indicator .arrow::after {
+    animation: none;
   }
 }
