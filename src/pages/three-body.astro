@@ -1,0 +1,239 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Three Body Visualization — Will">
+  <div class="sim-page">
+    <a href="/personal-site/" class="sim-back">&larr; Back</a>
+    <h1 class="sim-title">Three Body Visualization</h1>
+    <p class="sim-desc">
+      Three bodies of different masses interacting gravitationally in 3D space.
+      Trails show each body's path over time.
+    </p>
+    <canvas id="canvas"></canvas>
+  </div>
+</Layout>
+
+<style>
+  .sim-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .sim-back {
+    position: absolute;
+    top: 1.5rem;
+    left: 2rem;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.8rem;
+    color: #8888a0;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .sim-back:hover {
+    color: #e8e8ec;
+    opacity: 1;
+  }
+
+  .sim-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    color: #e8e8ec;
+  }
+
+  .sim-desc {
+    font-size: 0.85rem;
+    color: #8888a0;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    max-width: 480px;
+    line-height: 1.6;
+  }
+
+  #canvas {
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    max-width: 100%;
+  }
+</style>
+
+<script>
+  const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+  const ctx = canvas.getContext("2d")!;
+
+  const W = 800;
+  const H = 600;
+  canvas.width = W;
+  canvas.height = H;
+
+  const G = 0.8;
+  const DT = 0.008;
+  const TRAIL_LENGTH = 600;
+  const SOFTENING = 8;
+
+  interface Body {
+    x: number;
+    y: number;
+    z: number;
+    vx: number;
+    vy: number;
+    vz: number;
+    mass: number;
+    radius: number;
+    color: string;
+    trail: { x: number; y: number }[];
+  }
+
+  // Three bodies with different masses in a stable-ish initial config
+  const bodies: Body[] = [
+    {
+      x: -80, y: 0, z: 20,
+      vx: 0, vy: 2.5, vz: 0.3,
+      mass: 120,
+      radius: 7,
+      color: "#5ebbf7",
+      trail: [],
+    },
+    {
+      x: 80, y: 0, z: -10,
+      vx: 0, vy: -1.8, vz: -0.2,
+      mass: 90,
+      radius: 5.5,
+      color: "#f7a05e",
+      trail: [],
+    },
+    {
+      x: 0, y: 60, z: -30,
+      vx: -1.5, vy: 0, vz: 0.5,
+      mass: 70,
+      radius: 4.5,
+      color: "#a78bfa",
+      trail: [],
+    },
+  ];
+
+  // Simple 3D -> 2D projection with mild perspective
+  function project(x: number, y: number, z: number) {
+    const fov = 600;
+    const viewZ = 300;
+    const scale = fov / (fov + z + viewZ);
+    return {
+      x: W / 2 + x * scale,
+      y: H / 2 + y * scale,
+      scale,
+    };
+  }
+
+  function computeForces() {
+    for (let i = 0; i < bodies.length; i++) {
+      for (let j = i + 1; j < bodies.length; j++) {
+        const a = bodies[i];
+        const b = bodies[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dz = b.z - a.z;
+        const distSq = dx * dx + dy * dy + dz * dz + SOFTENING * SOFTENING;
+        const dist = Math.sqrt(distSq);
+        const force = G / distSq;
+
+        const fx = force * dx / dist;
+        const fy = force * dy / dist;
+        const fz = force * dz / dist;
+
+        a.vx += fx * b.mass * DT;
+        a.vy += fy * b.mass * DT;
+        a.vz += fz * b.mass * DT;
+
+        b.vx -= fx * a.mass * DT;
+        b.vy -= fy * a.mass * DT;
+        b.vz -= fz * a.mass * DT;
+      }
+    }
+  }
+
+  function update() {
+    computeForces();
+
+    for (const b of bodies) {
+      b.x += b.vx * DT;
+      b.y += b.vy * DT;
+      b.z += b.vz * DT;
+
+      const p = project(b.x, b.y, b.z);
+      b.trail.push({ x: p.x, y: p.y });
+      if (b.trail.length > TRAIL_LENGTH) {
+        b.trail.shift();
+      }
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = "rgba(10, 10, 15, 0.15)";
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw trails
+    for (const b of bodies) {
+      if (b.trail.length < 2) continue;
+
+      for (let i = 1; i < b.trail.length; i++) {
+        const alpha = (i / b.trail.length) * 0.7;
+        ctx.beginPath();
+        ctx.moveTo(b.trail[i - 1].x, b.trail[i - 1].y);
+        ctx.lineTo(b.trail[i].x, b.trail[i].y);
+        ctx.strokeStyle = b.color;
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+    }
+
+    ctx.globalAlpha = 1;
+
+    // Sort by z for depth ordering (draw far bodies first)
+    const sorted = [...bodies].sort((a, b) => a.z - b.z);
+
+    for (const b of sorted) {
+      const p = project(b.x, b.y, b.z);
+      const r = b.radius * p.scale;
+
+      // Glow
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 4);
+      grad.addColorStop(0, b.color + "30");
+      grad.addColorStop(1, "transparent");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Body
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = b.color;
+      ctx.fill();
+    }
+  }
+
+  // Run multiple physics steps per frame for smoother motion
+  function tick() {
+    for (let i = 0; i < 4; i++) {
+      update();
+    }
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  // Clear canvas once at start
+  ctx.fillStyle = "#0a0a0f";
+  ctx.fillRect(0, 0, W, H);
+
+  tick();
+</script>

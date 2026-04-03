@@ -2,11 +2,11 @@
 import Layout from "../layouts/Layout.astro";
 ---
 
-<Layout title="William — Developer & Data Analyst">
+<Layout title="Will — Developer & Data Analyst">
   <!-- Navigation -->
   <nav>
     <div class="container">
-      <a href="/" class="logo">william.</a>
+      <a href="/" class="logo">will.</a>
       <ul class="nav-links">
         <li><a href="#about">About</a></li>
         <li><a href="#blog">Blog</a></li>
@@ -21,7 +21,7 @@ import Layout from "../layouts/Layout.astro";
       <div class="hero-content">
         <p class="label reveal">Hello, I'm</p>
         <h1 class="reveal">
-          William
+          Will
           <br />
           <span>Developer & Data Analyst</span>
         </h1>
@@ -62,8 +62,19 @@ import Layout from "../layouts/Layout.astro";
         <h2>Projects</h2>
       </div>
 
-      <div class="coming-soon reveal">
-        <p class="coming-soon-title">Coming soon</p>
+      <div class="projects-grid stagger">
+        <a href="/personal-site/three-body/" class="project-card reveal">
+          <p class="project-label">Simulation</p>
+          <h3>Three Body Visualization</h3>
+          <p>
+            A real-time 3D simulation of three gravitationally interacting
+            bodies, with colored trails tracing their orbital paths.
+          </p>
+          <div class="tech">
+            <span>JavaScript</span>
+            <span>Canvas</span>
+          </div>
+        </a>
       </div>
     </div>
   </section>
@@ -71,7 +82,7 @@ import Layout from "../layouts/Layout.astro";
   <!-- Footer -->
   <footer class="reveal">
     <div class="container">
-      <p>&copy; {new Date().getFullYear()} William. Built with Astro.</p>
+      <p>&copy; {new Date().getFullYear()} Will</p>
     </div>
   </footer>
 </Layout>
@@ -90,7 +101,5 @@ import Layout from "../layouts/Layout.astro";
   );
 
   document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
-
-  // Also observe section-headers for the line animation
   document.querySelectorAll(".section-header").forEach((el) => observer.observe(el));
 </script>

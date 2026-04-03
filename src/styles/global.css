@@ -28,6 +28,8 @@ html {
 body {
   font-family: var(--font-sans);
   background: var(--bg);
+  background: linear-gradient(to bottom, #0a0a0f 0%, #1a1a24 100%);
+  background-attachment: fixed;
   color: var(--text);
   line-height: 1.6;
   overflow-x: hidden;
@@ -495,6 +497,12 @@ nav .nav-links a:hover::after {
   flex-direction: column;
   transition: background 0.4s, box-shadow 0.4s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.project-card:hover {
+  opacity: 1;
 }
 
 .project-card::after {
