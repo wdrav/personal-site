@@ -123,6 +123,8 @@
     base: number; // height of the segment's bottom, aligns window rows
     seed: number;
     win: number; // fraction of windows that can light up
+    outline: number; // 1 = draw a faint outline along this piece's edges
+    tierTop: number; // 1 = top segment of a tier, so its top edge is outlined
     color: [number, number, number];
     level: number; // 0 = bottom of its building, 1 = top
     buildingTop: number;
@@ -146,6 +148,7 @@
     z: number,
     tiers: Tier[],
     color: [number, number, number],
+    opts: { outline?: boolean } = {},
   ) {
     const segments: Omit<Piece, "level" | "buildingTop" | "introDelay" | "breakDelay">[] = [];
     let y = 0;
@@ -165,6 +168,8 @@
           base: y,
           seed: rand() * 100,
           win: tier.win ?? 0.38,
+          outline: opts.outline ? 1 : 0,
+          tierTop: i === n - 1 ? 1 : 0,
           color,
           sx: (rand() - 0.5) * 26,
           sy: 6 + rand() * 8,
@@ -222,19 +227,47 @@
   }
 
   // --- New York landmarks ---
-  // One World Trade Center: a tapering, twisting tower with a spire.
+  // Heights are roughly to scale (about 0.058 units per meter). Landmarks get a
+  // faint outline (`outline: true`) so their silhouettes read at a glance.
+  // Left to right: Lower Manhattan, then Hudson Yards and Midtown.
+
+  // One World Trade Center (417 m roof, 541 m spire): square podium, then a
+  // tapering shaft whose corners twist 45 degrees, topped by a spire.
   {
-    const tiers: Tier[] = [{ w: 4.6, d: 4.6, h: 3 }];
+    const tiers: Tier[] = [{ w: 4.6, d: 4.6, h: 3.2 }];
     const steps = 8;
     for (let i = 0; i < steps; i++) {
       const t = i / (steps - 1);
-      tiers.push({ w: 4.4 - 1.8 * t, d: 4.4 - 1.8 * t, h: 2.4, rot: (Math.PI / 4) * t });
+      tiers.push({ w: 4.4 - 1.9 * t, d: 4.4 - 1.9 * t, h: 2.6, rot: (Math.PI / 4) * t });
     }
-    tiers.push({ w: 2.2, d: 2.2, h: 0.6, rot: Math.PI / 4, win: 0 });
-    tiers.push({ w: 0.22, d: 0.22, h: 6, win: 0 });
-    addBuilding(0, -24, -5, tiers, LANDMARK);
+    tiers.push({ w: 2.2, d: 2.2, h: 0.5, rot: Math.PI / 4, win: 0 });
+    tiers.push({ w: 0.22, d: 0.22, h: 3.4, win: 0 }); // shortened so it stays below the hero links
+    addBuilding(0, -24, -5, tiers, LANDMARK, { outline: true });
   }
-  // Empire State Building: stepped setbacks and an antenna.
+  // Two Manhattan West (285 m): flat-topped glass slab.
+  addBuilding(
+    0,
+    -2.6,
+    -7,
+    [
+      { w: 3.4, d: 2.8, h: 15.6 },
+      { w: 3.0, d: 2.5, h: 0.9, win: 0 },
+    ],
+    LANDMARK,
+    { outline: true },
+  );
+  // One Manhattan West (303 m): glass tower that widens slightly as it rises.
+  {
+    const tiers: Tier[] = [];
+    const steps = 7;
+    for (let i = 0; i < steps; i++) {
+      const t = i / (steps - 1);
+      tiers.push({ w: 3.0 + 0.6 * t, d: 2.8 + 0.5 * t, h: 2.4 });
+    }
+    tiers.push({ w: 3.2, d: 2.9, h: 0.8, win: 0 });
+    addBuilding(0, 2.2, -6, tiers, LANDMARK, { outline: true });
+  }
+  // Empire State Building (381 m roof, 443 m tip): stepped setbacks and an antenna.
   addBuilding(
     0,
     12,
@@ -248,11 +281,12 @@
       { w: 0.25, d: 0.25, h: 3.6, win: 0 },
     ],
     LANDMARK,
+    { outline: true },
   );
   // Chrysler Building: tower with a stepped, narrowing crown.
   addBuilding(
     0,
-    21,
+    19.5,
     -7,
     [
       { w: 4, d: 3, h: 3.6 },
@@ -265,15 +299,32 @@
     ],
     LANDMARK,
   );
+  // JPMorganChase headquarters, 270 Park Avenue (423 m): a narrower base on
+  // fan columns, a broad shaft, three setbacks, and a crown of roof fins.
+  addBuilding(
+    0,
+    26,
+    -9,
+    [
+      { w: 3.8, d: 2.8, h: 2.2, win: 0.15 },
+      { w: 5.2, d: 3.6, h: 11 },
+      { w: 4.4, d: 3.3, h: 5 },
+      { w: 3.6, d: 3, h: 4.2 },
+      { w: 3.2, d: 2.6, h: 2, win: 0 },
+    ],
+    LANDMARK,
+    { outline: true },
+  );
   // 432 Park Avenue: very tall and very thin.
-  addBuilding(0, 29, -6, [{ w: 1.6, d: 1.6, h: 21, win: 0.5 }], LANDMARK);
-  // A few big Midtown/Hudson Yards towers.
-  addBuilding(0, 3, -6, [{ w: 3.4, d: 3, h: 12 }, { w: 2.4, d: 2.2, h: 5 }], LANDMARK);
-  addBuilding(0, 36, -8, [{ w: 3, d: 3, h: 15 }], LANDMARK);
+  addBuilding(0, 31.5, -6, [{ w: 1.6, d: 1.6, h: 21, win: 0.5 }], LANDMARK);
+  // A few more big towers to fill out the clusters.
+  addBuilding(0, 37, -8, [{ w: 3, d: 3, h: 15 }], LANDMARK);
   addBuilding(0, -31, -7, [{ w: 3.2, d: 3, h: 13 }], LANDMARK);
   addBuilding(0, -17, -8, [{ w: 2.8, d: 2.6, h: 11 }, { w: 1.8, d: 1.8, h: 3 }], LANDMARK);
 
-  const nearLandmark = (x: number) => [-24, 12, 21, 29].some((lx) => Math.abs(x - lx) < 2.6);
+  // Keep the middle row from standing in front of the landmarks.
+  const nearLandmark = (x: number) =>
+    [-24, -2.6, 2.2, 12, 19.5, 26, 31.5].some((lx) => Math.abs(x - lx) < 2.8);
   fillRow(-24, 1.15, BACK, () => false);
   fillRow(-13, 0.95, MID, nearLandmark);
   fillRow(2, 0.5, FRONT, () => false);
@@ -338,6 +389,7 @@
     const aBase = new Float32Array(count);
     const aSeed = new Float32Array(count);
     const aWin = new Float32Array(count);
+    const aOutline = new Float32Array(count * 2);
     const aColor = new Float32Array(count * 3);
     const aLit = new Float32Array(count);
     pieces.forEach((p, i) => {
@@ -345,12 +397,14 @@
       aBase[i] = p.base;
       aSeed[i] = p.seed;
       aWin[i] = p.win;
+      aOutline.set([p.outline, p.tierTop], i * 2);
       aColor.set(p.color, i * 3);
     });
     boxGeo.setAttribute("aSize", new InstancedBufferAttribute(aSize, 3));
     boxGeo.setAttribute("aBase", new InstancedBufferAttribute(aBase, 1));
     boxGeo.setAttribute("aSeed", new InstancedBufferAttribute(aSeed, 1));
     boxGeo.setAttribute("aWin", new InstancedBufferAttribute(aWin, 1));
+    boxGeo.setAttribute("aOutline", new InstancedBufferAttribute(aOutline, 2));
     boxGeo.setAttribute("aColor", new InstancedBufferAttribute(aColor, 3));
     const litAttr = new InstancedBufferAttribute(aLit, 1);
     litAttr.setUsage(DynamicDrawUsage);
@@ -369,7 +423,11 @@
         attribute float aWin;
         attribute vec3 aColor;
         attribute float aLit;
+        attribute vec2 aOutline;
         varying vec3 vLocal;
+        varying vec3 vSize;
+        varying vec2 vOutline;
+        varying float vTop;
         varying vec3 vNormal;
         varying vec3 vColor;
         varying float vSeed;
@@ -379,6 +437,9 @@
         void main() {
           vLocal = position * aSize + vec3(0.0, aBase + aSize.y * 0.5, 0.0);
           vNormal = normal;
+          vSize = aSize;
+          vOutline = aOutline;
+          vTop = aBase + aSize.y;
           vColor = aColor;
           vSeed = aSeed;
           vWin = aWin;
@@ -393,6 +454,9 @@
         uniform float uFogNear;
         uniform float uFogFar;
         varying vec3 vLocal;
+        varying vec3 vSize;
+        varying vec2 vOutline;
+        varying float vTop;
         varying vec3 vNormal;
         varying vec3 vColor;
         varying float vSeed;
@@ -404,6 +468,7 @@
         }
         void main() {
           vec3 n = normalize(vNormal);
+          vec3 fw = fwidth(vLocal); // world units per pixel, for 1px outlines
           float shade = n.y > 0.5 ? 1.3 : (abs(n.x) > 0.5 ? 0.72 : 1.0);
           vec3 col = vColor * shade * (0.55 + 0.45 * clamp(vLocal.y / 22.0, 0.0, 1.0));
           if (vWin > 0.0 && n.y < 0.5 && n.y > -0.5) {
@@ -422,6 +487,19 @@
             vec3 cool = vec3(0.6, 0.82, 1.0);
             vec3 wc = h2 < 0.65 ? warm : (h2 < 0.9 ? white : cool);
             col = mix(col, wc * (0.65 + 0.35 * h1), inWin * on);
+          }
+          // Landmark outline: vertical corners, roof edges, and the top of each setback.
+          if (vOutline.x > 0.5 && n.y > -0.5) {
+            float e;
+            if (n.y > 0.5) {
+              e = min(vSize.x * 0.5 - abs(vLocal.x), vSize.z * 0.5 - abs(vLocal.z));
+            } else {
+              e = abs(n.z) > 0.5 ? vSize.x * 0.5 - abs(vLocal.x) : vSize.z * 0.5 - abs(vLocal.z);
+              if (vOutline.y > 0.5) e = min(e, vTop - vLocal.y);
+            }
+            float px = e / max(max(fw.x, max(fw.y, fw.z)), 1e-4);
+            float line = 1.0 - smoothstep(0.5, 1.5, px);
+            col = mix(col, vec3(0.45, 0.76, 0.98), line * 0.8 * vLit);
           }
           float fogF = smoothstep(uFogNear, uFogFar, vDepth);
           gl_FragColor = vec4(mix(col, uFogColor, fogF), 1.0);
