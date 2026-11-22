@@ -1,0 +1,728 @@
+---
+// Full-screen WebGL background: New York's skyline assembles at night, then
+// breaks apart on scroll while Denver and the Front Range rise in its place.
+//
+// Everything on screen is a pure function of (introTime, progress), where
+// progress (0..1) comes from how far the page has scrolled through the
+// element with [data-scene-scroll]. Scrolling back up rebuilds New York.
+//
+// Debug: ?p=0.5 pins progress (and skips the intro); ?t=1.2 pins intro time.
+---
+
+<canvas id="skyline" aria-hidden="true"></canvas>
+
+<style>
+  #skyline {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    display: block;
+  }
+</style>
+
+<script>
+  import {
+    BoxGeometry,
+    BufferGeometry,
+    ColorManagement,
+    Float32BufferAttribute,
+    Fog,
+    InstancedBufferAttribute,
+    InstancedMesh,
+    LinearSRGBColorSpace,
+    Matrix4,
+    Mesh,
+    MeshBasicMaterial,
+    PerspectiveCamera,
+    PlaneGeometry,
+    Points,
+    Quaternion,
+    Euler,
+    Scene,
+    ShaderMaterial,
+    Vector3,
+    WebGLRenderer,
+    DynamicDrawUsage,
+  } from "three";
+
+  // ---------- Tunables ----------
+  const FOG_COLOR: [number, number, number] = [0.078, 0.08, 0.108]; // matches the CSS sky near the horizon
+  const FOG_NEAR = 110;
+  const FOG_FAR = 420;
+  const INTRO_PIECE_DURATION = 0.6; // seconds each block takes to land
+  const NYC_BREAK_START = 0.03; // progress where New York starts falling apart
+  const NYC_BREAK_SPAN = 0.3; // how long each block takes to fall
+  const DEN_RISE_START = 0.5; // progress where downtown Denver starts rising
+  const MOUNTAIN_PHASES: [number, number][] = [
+    [0.15, 0.6], // far range
+    [0.22, 0.68], // middle range
+    [0.3, 0.75], // foothills
+  ];
+
+  ColorManagement.enabled = false; // all colors below are authored as-is
+
+  // ---------- Small helpers ----------
+  function mulberry32(seed: number) {
+    return () => {
+      seed |= 0;
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+  const smoothstep = (a: number, b: number, v: number) => {
+    const t = clamp01((v - a) / (b - a));
+    return t * t * (3 - 2 * t);
+  };
+  const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+  const gauss = (x: number, mu: number, sigma: number) =>
+    Math.exp(-((x - mu) * (x - mu)) / (2 * sigma * sigma));
+
+  function hash1(n: number) {
+    const s = Math.sin(n * 127.1) * 43758.5453;
+    return s - Math.floor(s);
+  }
+  function noise1(x: number, seed: number) {
+    const i = Math.floor(x);
+    const f = x - i;
+    const a = hash1(i + seed * 131.7);
+    const b = hash1(i + 1 + seed * 131.7);
+    const u = f * f * (3 - 2 * f);
+    return a + (b - a) * u;
+  }
+  function fbm(x: number, seed: number) {
+    let v = 0;
+    let amp = 0.5;
+    let freq = 1;
+    for (let o = 0; o < 5; o++) {
+      // ridged noise gives sharper, more mountain-like peaks
+      const n = noise1(x * freq, seed + o * 7);
+      v += amp * (1 - Math.abs(2 * n - 1));
+      freq *= 2.1;
+      amp *= 0.5;
+    }
+    return v;
+  }
+
+  // ---------- Building pieces ----------
+  type Tier = { w: number; d: number; h: number; rot?: number; win?: number };
+  type Piece = {
+    city: 0 | 1; // 0 = New York, 1 = Denver
+    x: number;
+    y: number; // center height when assembled
+    z: number;
+    w: number;
+    h: number;
+    d: number;
+    rotY: number;
+    base: number; // height of the segment's bottom, aligns window rows
+    seed: number;
+    win: number; // fraction of windows that can light up
+    color: [number, number, number];
+    level: number; // 0 = bottom of its building, 1 = top
+    buildingTop: number;
+    introDelay: number;
+    breakDelay: number;
+    sx: number;
+    sy: number;
+    sz: number;
+    rx: number;
+    ry: number;
+    rz: number;
+  };
+
+  const rand = mulberry32(20260522);
+  const pieces: Piece[] = [];
+  const SEGMENT_HEIGHT = 2.4;
+
+  function addBuilding(
+    city: 0 | 1,
+    x: number,
+    z: number,
+    tiers: Tier[],
+    color: [number, number, number],
+  ) {
+    const segments: Omit<Piece, "level" | "buildingTop" | "introDelay" | "breakDelay">[] = [];
+    let y = 0;
+    for (const tier of tiers) {
+      const n = Math.max(1, Math.round(tier.h / SEGMENT_HEIGHT));
+      const sh = tier.h / n;
+      for (let i = 0; i < n; i++) {
+        segments.push({
+          city,
+          x,
+          y: y + sh / 2,
+          z,
+          w: tier.w,
+          h: sh,
+          d: tier.d,
+          rotY: tier.rot ?? 0,
+          base: y,
+          seed: rand() * 100,
+          win: tier.win ?? 0.38,
+          color,
+          sx: (rand() - 0.5) * 26,
+          sy: 6 + rand() * 8,
+          sz: (rand() - 0.2) * 22,
+          rx: (rand() - 0.5) * 5,
+          ry: (rand() - 0.5) * 5,
+          rz: (rand() - 0.5) * 5,
+        });
+        y += sh;
+      }
+    }
+    const top = y;
+    segments.forEach((s, i) => {
+      const level = segments.length > 1 ? i / (segments.length - 1) : 0;
+      pieces.push({
+        ...s,
+        level,
+        buildingTop: top,
+        // assemble left to right, bottom to top
+        introDelay: 0.15 + ((x + 80) / 160) * 1.3 + i * 0.045 + rand() * 0.15,
+        // tops crumble first
+        breakDelay: (1 - level) * 0.14 + rand() * 0.12 + ((x + 80) / 160) * 0.06,
+      });
+    });
+  }
+
+  // Colors get lighter with distance; fog does the rest.
+  const FRONT: [number, number, number] = [0.05, 0.06, 0.1];
+  const MID: [number, number, number] = [0.075, 0.088, 0.145];
+  const BACK: [number, number, number] = [0.1, 0.115, 0.185];
+  const LANDMARK: [number, number, number] = [0.085, 0.1, 0.16];
+
+  // Height envelope: Lower Manhattan on the left, Midtown on the right.
+  const nycEnvelope = (x: number) =>
+    3 + 11 * gauss(x, -24, 9) + 12 * gauss(x, 18, 15) + 2 * rand();
+
+  function fillRow(z: number, heightScale: number, color: [number, number, number], skip: (x: number) => boolean) {
+    let x = -85;
+    while (x < 85) {
+      const w = 1.6 + rand() * 2.6;
+      const cx = x + w / 2;
+      if (!skip(cx)) {
+        const h = Math.max(1.5, nycEnvelope(cx) * heightScale * (0.55 + rand() * 0.6));
+        const d = 2 + rand() * 2;
+        const tiers: Tier[] = [{ w, d, h }];
+        if (h > 9 && rand() < 0.45) {
+          // setback tower
+          tiers[0].h = h * 0.65;
+          tiers.push({ w: w * 0.7, d: d * 0.7, h: h * 0.35 });
+        }
+        addBuilding(0, cx, z + (rand() - 0.5) * 2, tiers, color);
+      }
+      x += w + 0.25 + rand() * 0.9;
+    }
+  }
+
+  // --- New York landmarks ---
+  // One World Trade Center: a tapering, twisting tower with a spire.
+  {
+    const tiers: Tier[] = [{ w: 4.6, d: 4.6, h: 3 }];
+    const steps = 8;
+    for (let i = 0; i < steps; i++) {
+      const t = i / (steps - 1);
+      tiers.push({ w: 4.4 - 1.8 * t, d: 4.4 - 1.8 * t, h: 2.4, rot: (Math.PI / 4) * t });
+    }
+    tiers.push({ w: 2.2, d: 2.2, h: 0.6, rot: Math.PI / 4, win: 0 });
+    tiers.push({ w: 0.22, d: 0.22, h: 6, win: 0 });
+    addBuilding(0, -24, -5, tiers, LANDMARK);
+  }
+  // Empire State Building: stepped setbacks and an antenna.
+  addBuilding(
+    0,
+    12,
+    -5,
+    [
+      { w: 6, d: 4, h: 4.5 },
+      { w: 4.2, d: 3.2, h: 12 },
+      { w: 3, d: 2.4, h: 2.4 },
+      { w: 1.8, d: 1.6, h: 1.6 },
+      { w: 1, d: 1, h: 1.6, win: 0.6 },
+      { w: 0.25, d: 0.25, h: 3.6, win: 0 },
+    ],
+    LANDMARK,
+  );
+  // Chrysler Building: tower with a stepped, narrowing crown.
+  addBuilding(
+    0,
+    21,
+    -7,
+    [
+      { w: 4, d: 3, h: 3.6 },
+      { w: 2.8, d: 2.6, h: 9.6 },
+      { w: 2.2, d: 2.2, h: 1.2, win: 0.7 },
+      { w: 1.7, d: 1.7, h: 1.2, win: 0.7 },
+      { w: 1.2, d: 1.2, h: 1.2, win: 0.7 },
+      { w: 0.7, d: 0.7, h: 1.2, win: 0.7 },
+      { w: 0.18, d: 0.18, h: 2.6, win: 0 },
+    ],
+    LANDMARK,
+  );
+  // 432 Park Avenue: very tall and very thin.
+  addBuilding(0, 29, -6, [{ w: 1.6, d: 1.6, h: 21, win: 0.5 }], LANDMARK);
+  // A few big Midtown/Hudson Yards towers.
+  addBuilding(0, 3, -6, [{ w: 3.4, d: 3, h: 12 }, { w: 2.4, d: 2.2, h: 5 }], LANDMARK);
+  addBuilding(0, 36, -8, [{ w: 3, d: 3, h: 15 }], LANDMARK);
+  addBuilding(0, -31, -7, [{ w: 3.2, d: 3, h: 13 }], LANDMARK);
+  addBuilding(0, -17, -8, [{ w: 2.8, d: 2.6, h: 11 }, { w: 1.8, d: 1.8, h: 3 }], LANDMARK);
+
+  const nearLandmark = (x: number) => [-24, 12, 21, 29].some((lx) => Math.abs(x - lx) < 2.6);
+  fillRow(-24, 1.15, BACK, () => false);
+  fillRow(-13, 0.95, MID, nearLandmark);
+  fillRow(2, 0.5, FRONT, () => false);
+
+  // --- Denver ---
+  const DEN: [number, number, number] = [0.07, 0.085, 0.14];
+  const denver: [number, Tier[]][] = [
+    [-2, [{ w: 3, d: 3, h: 16 }]], // Republic Plaza
+    [4, [{ w: 3.4, d: 2.6, h: 11 }, { w: 2.6, d: 2.2, h: 2 }, { w: 1.6, d: 1.6, h: 1.4, win: 0.6 }]], // Wells Fargo Center
+    [-7, [{ w: 2.8, d: 2.8, h: 14 }]], // 1801 California
+    [9, [{ w: 2.4, d: 2.4, h: 12 }]],
+    [-11.5, [{ w: 2.4, d: 2.2, h: 9 }]],
+    [13, [{ w: 2.6, d: 2.2, h: 8 }]],
+    [1, [{ w: 2, d: 2, h: 9.5 }]],
+    [-15, [{ w: 2.2, d: 2, h: 6 }]],
+    [16.5, [{ w: 2, d: 2, h: 5.5 }]],
+  ];
+  for (const [x, tiers] of denver) addBuilding(1, x, -30, tiers, DEN);
+  for (let x = -60; x < 60; x += 2.2 + rand() * 2) {
+    if (Math.abs(x) < 18) continue;
+    addBuilding(1, x, -24 - rand() * 6, [{ w: 1.6 + rand() * 1.6, d: 2, h: 1.2 + rand() * 2.6, win: 0.3 }], DEN);
+  }
+  // Denver rises from the ground as whole buildings, not piece by piece.
+  for (const p of pieces) if (p.city === 1) p.introDelay = rand() * 0.1 + Math.abs(p.x) * 0.002;
+
+  // ---------- Renderer ----------
+  const canvas = document.getElementById("skyline") as HTMLCanvasElement;
+  let renderer: WebGLRenderer | null = null;
+  try {
+    renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "low-power" });
+  } catch {
+    canvas.remove(); // no WebGL: the CSS gradient background remains
+  }
+
+  if (renderer) {
+    renderer.outputColorSpace = LinearSRGBColorSpace;
+    renderer.setClearColor(0x000000, 0);
+
+    const scene = new Scene();
+    scene.fog = new Fog(
+      (FOG_COLOR[0] * 255) << 16 | (FOG_COLOR[1] * 255) << 8 | (FOG_COLOR[2] * 255),
+      FOG_NEAR,
+      FOG_FAR,
+    );
+    const camera = new PerspectiveCamera(40, 1, 1, 2000);
+    const CAMERA_Z = 115;
+    camera.position.set(0, 20, CAMERA_Z);
+
+    // Ground / water: hides blocks falling through it and ranges rising out of it.
+    const ground = new Mesh(
+      new PlaneGeometry(3000, 460), // ends just behind the far range
+      new MeshBasicMaterial({ color: 0x07080e }),
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.z = -30;
+    scene.add(ground);
+
+    // --- Buildings: one instanced mesh, windows drawn in the shader ---
+    const count = pieces.length;
+    const boxGeo = new BoxGeometry(1, 1, 1);
+    const aSize = new Float32Array(count * 3);
+    const aBase = new Float32Array(count);
+    const aSeed = new Float32Array(count);
+    const aWin = new Float32Array(count);
+    const aColor = new Float32Array(count * 3);
+    const aLit = new Float32Array(count);
+    pieces.forEach((p, i) => {
+      aSize.set([p.w, p.h, p.d], i * 3);
+      aBase[i] = p.base;
+      aSeed[i] = p.seed;
+      aWin[i] = p.win;
+      aColor.set(p.color, i * 3);
+    });
+    boxGeo.setAttribute("aSize", new InstancedBufferAttribute(aSize, 3));
+    boxGeo.setAttribute("aBase", new InstancedBufferAttribute(aBase, 1));
+    boxGeo.setAttribute("aSeed", new InstancedBufferAttribute(aSeed, 1));
+    boxGeo.setAttribute("aWin", new InstancedBufferAttribute(aWin, 1));
+    boxGeo.setAttribute("aColor", new InstancedBufferAttribute(aColor, 3));
+    const litAttr = new InstancedBufferAttribute(aLit, 1);
+    litAttr.setUsage(DynamicDrawUsage);
+    boxGeo.setAttribute("aLit", litAttr);
+
+    const buildingMat = new ShaderMaterial({
+      uniforms: {
+        uFogColor: { value: new Vector3(...FOG_COLOR) },
+        uFogNear: { value: FOG_NEAR },
+        uFogFar: { value: FOG_FAR },
+      },
+      vertexShader: /* glsl */ `
+        attribute vec3 aSize;
+        attribute float aBase;
+        attribute float aSeed;
+        attribute float aWin;
+        attribute vec3 aColor;
+        attribute float aLit;
+        varying vec3 vLocal;
+        varying vec3 vNormal;
+        varying vec3 vColor;
+        varying float vSeed;
+        varying float vWin;
+        varying float vLit;
+        varying float vDepth;
+        void main() {
+          vLocal = position * aSize + vec3(0.0, aBase + aSize.y * 0.5, 0.0);
+          vNormal = normal;
+          vColor = aColor;
+          vSeed = aSeed;
+          vWin = aWin;
+          vLit = aLit;
+          vec4 mv = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+          vDepth = -mv.z;
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uFogColor;
+        uniform float uFogNear;
+        uniform float uFogFar;
+        varying vec3 vLocal;
+        varying vec3 vNormal;
+        varying vec3 vColor;
+        varying float vSeed;
+        varying float vWin;
+        varying float vLit;
+        varying float vDepth;
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+        void main() {
+          vec3 n = normalize(vNormal);
+          float shade = n.y > 0.5 ? 1.3 : (abs(n.x) > 0.5 ? 0.72 : 1.0);
+          vec3 col = vColor * shade * (0.55 + 0.45 * clamp(vLocal.y / 22.0, 0.0, 1.0));
+          if (vWin > 0.0 && n.y < 0.5 && n.y > -0.5) {
+            vec2 uv = abs(n.z) > 0.5 ? vLocal.xy : vLocal.zy;
+            vec2 cellSize = vec2(0.5, 0.72);
+            vec2 g = uv / cellSize;
+            vec2 cell = floor(g);
+            vec2 f = fract(g);
+            float inWin = step(0.24, f.x) * step(f.x, 0.76) * step(0.26, f.y) * step(f.y, 0.74);
+            float face = n.x * 3.0 + n.z * 5.0;
+            float h1 = hash(cell + vSeed * 17.0 + face);
+            float h2 = hash(cell * 1.7 + vSeed + face * 2.0);
+            float on = step(1.0 - vWin, h1) * step(h2, vLit);
+            vec3 warm = vec3(1.0, 0.8, 0.45);
+            vec3 white = vec3(1.0, 0.93, 0.8);
+            vec3 cool = vec3(0.6, 0.82, 1.0);
+            vec3 wc = h2 < 0.65 ? warm : (h2 < 0.9 ? white : cool);
+            col = mix(col, wc * (0.65 + 0.35 * h1), inWin * on);
+          }
+          float fogF = smoothstep(uFogNear, uFogFar, vDepth);
+          gl_FragColor = vec4(mix(col, uFogColor, fogF), 1.0);
+        }
+      `,
+    });
+    const buildings = new InstancedMesh(boxGeo, buildingMat, count);
+    buildings.instanceMatrix.setUsage(DynamicDrawUsage);
+    buildings.frustumCulled = false;
+    scene.add(buildings);
+
+    // --- Front Range: three ridge layers with moonlit snow on the high peaks ---
+    type Range = { mesh: Mesh; maxH: number; phase: [number, number] };
+    const ranges: Range[] = [];
+    function makeRange(
+      z: number,
+      heightAt: (x: number) => number,
+      base: [number, number, number],
+      snow: [number, number, number] | null,
+      snowLine: number,
+      phase: [number, number],
+    ) {
+      const cols = 260;
+      const rows = 16;
+      const xMin = -420;
+      const xMax = 420;
+      const bottom = -6;
+      const pos: number[] = [];
+      const colors: number[] = [];
+      const idx: number[] = [];
+      let maxH = 0;
+      for (let c = 0; c <= cols; c++) {
+        const x = xMin + ((xMax - xMin) * c) / cols;
+        const top = heightAt(x);
+        maxH = Math.max(maxH, top);
+        const line = snowLine + (noise1(x / 6, 3) - 0.5) * 6;
+        for (let r = 0; r <= rows; r++) {
+          const t = r / rows;
+          const y = bottom + (top - bottom) * t;
+          pos.push(x, y, 0);
+          const dark = 0.55 + 0.45 * t;
+          let col: [number, number, number] = [base[0] * dark, base[1] * dark, base[2] * dark];
+          if (snow) {
+            const s = smoothstep(line, line + 4, y) * smoothstep(0.55, 0.8, t);
+            col = [
+              col[0] + (snow[0] - col[0]) * s,
+              col[1] + (snow[1] - col[1]) * s,
+              col[2] + (snow[2] - col[2]) * s,
+            ];
+          }
+          colors.push(...col);
+        }
+      }
+      for (let c = 0; c < cols; c++) {
+        for (let r = 0; r < rows; r++) {
+          const a = c * (rows + 1) + r;
+          const b = a + rows + 1;
+          idx.push(a, b, a + 1, b, b + 1, a + 1);
+        }
+      }
+      const geo = new BufferGeometry();
+      geo.setAttribute("position", new Float32BufferAttribute(pos, 3));
+      geo.setAttribute("color", new Float32BufferAttribute(colors, 3));
+      geo.setIndex(idx);
+      const mesh = new Mesh(geo, new MeshBasicMaterial({ vertexColors: true }));
+      mesh.position.z = z;
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      ranges.push({ mesh, maxH, phase });
+    }
+    // Looking west from Denver: Pikes Peak far left, Mount Blue Sky center-left,
+    // Longs Peak on the right.
+    makeRange(
+      -210,
+      (x) =>
+        14 + 16 * fbm(x / 38, 1) + 12 * gauss(x, -150, 26) + 9 * gauss(x, -40, 18) + 10 * gauss(x, 105, 16),
+      [0.17, 0.2, 0.3],
+      [0.72, 0.77, 0.88],
+      28,
+      MOUNTAIN_PHASES[0],
+    );
+    makeRange(-145, (x) => 9 + 13 * fbm(x / 26, 5), [0.11, 0.13, 0.21], [0.44, 0.48, 0.58], 20, MOUNTAIN_PHASES[1]);
+    makeRange(-80, (x) => 3 + 9 * fbm(x / 15, 9), [0.05, 0.06, 0.1], null, 0, MOUNTAIN_PHASES[2]);
+
+    // --- Stars ---
+    const starCount = 700;
+    const starPos = new Float32Array(starCount * 3);
+    const starSize = new Float32Array(starCount);
+    const starPhase = new Float32Array(starCount);
+    for (let i = 0; i < starCount; i++) {
+      starPos.set([(rand() - 0.5) * 1100, 25 + rand() * 260, -380], i * 3);
+      starSize[i] = 0.8 + Math.pow(rand(), 3) * 2.4;
+      starPhase[i] = rand() * Math.PI * 2;
+    }
+    const starGeo = new BufferGeometry();
+    starGeo.setAttribute("position", new Float32BufferAttribute(starPos, 3));
+    starGeo.setAttribute("aSize", new Float32BufferAttribute(starSize, 1));
+    starGeo.setAttribute("aPhase", new Float32BufferAttribute(starPhase, 1));
+    const starMat = new ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      uniforms: { uTime: { value: 0 }, uPixelRatio: { value: 1 } },
+      vertexShader: /* glsl */ `
+        attribute float aSize;
+        attribute float aPhase;
+        uniform float uTime;
+        uniform float uPixelRatio;
+        varying float vAlpha;
+        void main() {
+          vAlpha = 0.45 + 0.35 * sin(uTime * (0.6 + fract(aPhase) * 1.4) + aPhase) ;
+          gl_PointSize = aSize * uPixelRatio;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        varying float vAlpha;
+        void main() {
+          float d = length(gl_PointCoord - 0.5);
+          gl_FragColor = vec4(0.85, 0.9, 1.0, vAlpha * smoothstep(0.5, 0.1, d));
+        }
+      `,
+    });
+    const stars = new Points(starGeo, starMat);
+    stars.frustumCulled = false;
+    scene.add(stars);
+
+    // --- Moon with a soft glow ---
+    const moon = new Mesh(
+      new PlaneGeometry(60, 60),
+      new ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        vertexShader: /* glsl */ `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: /* glsl */ `
+          varying vec2 vUv;
+          void main() {
+            float d = length(vUv - 0.5) * 2.0;
+            float disc = smoothstep(0.2, 0.185, d);
+            float glow = pow(max(0.0, 1.0 - d), 3.0) * 0.35;
+            vec3 col = mix(vec3(0.55, 0.65, 0.9), vec3(0.92, 0.91, 0.84), disc);
+            gl_FragColor = vec4(col, max(disc, glow));
+          }
+        `,
+      }),
+    );
+    moon.position.set(130, 150, -370);
+    scene.add(moon);
+
+    // ---------- State ----------
+    const params = new URLSearchParams(location.search);
+    const pinnedP = params.has("p") ? clamp01(Number(params.get("p"))) : null;
+    const pinnedT = params.has("t") ? Number(params.get("t")) : null;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const scrollEl = document.querySelector<HTMLElement>("[data-scene-scroll]");
+
+    function readProgress() {
+      if (pinnedP !== null) return pinnedP;
+      if (!scrollEl) return 0;
+      const end = scrollEl.getBoundingClientRect().bottom + window.scrollY - window.innerHeight;
+      const p = end > 0 ? clamp01(window.scrollY / end) : 0;
+      // With reduced motion, swap scenes at the halfway point instead of animating.
+      return reducedMotion ? (p < 0.5 ? 0 : 1) : p;
+    }
+
+    let targetP = readProgress();
+    let progress = targetP;
+    window.addEventListener("scroll", () => (targetP = readProgress()), { passive: true });
+
+    // ---------- Sizing ----------
+    let lastW = 0;
+    let lastH = 0;
+    function resize() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      // Ignore small height-only changes (mobile address bar showing/hiding).
+      if (w === lastW && Math.abs(h - lastH) < 150) return;
+      lastW = w;
+      lastH = h;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      renderer!.setPixelRatio(dpr);
+      renderer!.setSize(w, h, false);
+      starMat.uniforms.uPixelRatio.value = dpr;
+      const aspect = w / h;
+      camera.aspect = aspect;
+      // Keep at least ~64 units of skyline in view on narrow (portrait) screens.
+      const minHalfWidth = 32;
+      const fovForWidth = (2 * Math.atan(minHalfWidth / aspect / CAMERA_Z) * 180) / Math.PI;
+      camera.fov = Math.max(40, fovForWidth);
+      // Aim so the base of the skyline sits 5% above the bottom of the screen,
+      // keeping buildings and peaks in the lower part, below the hero text.
+      const groundAngle = Math.atan(-camera.position.y / CAMERA_Z);
+      const centerAngle = groundAngle + ((0.45 * camera.fov) * Math.PI) / 180;
+      camera.lookAt(0, camera.position.y + Math.tan(centerAngle) * CAMERA_Z, 0);
+      camera.updateProjectionMatrix();
+      targetP = readProgress();
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    // ---------- Per-frame update ----------
+    const m = new Matrix4();
+    const q = new Quaternion();
+    const e = new Euler();
+    const v = new Vector3();
+    const s = new Vector3();
+
+    function update(introTime: number, p: number) {
+      for (let i = 0; i < count; i++) {
+        const pc = pieces[i];
+        let x = pc.x;
+        let y = pc.y;
+        let z = pc.z;
+        let rx = 0;
+        let ry = pc.rotY;
+        let rz = 0;
+        let scale = 1;
+        let lit = 0;
+
+        if (pc.city === 0) {
+          // Assemble: blocks drop in and grow into place, then windows switch on.
+          const ti = clamp01((introTime - pc.introDelay) / INTRO_PIECE_DURATION);
+          const k = easeOutCubic(ti);
+          y += (1 - k) * 14;
+          scale = k;
+          lit = smoothstep(0, 1, (introTime - pc.introDelay - 0.45 - (pc.seed % 1) * 0.8) / 1.2);
+          // Break apart: tops first, blocks burst outward and fall through the ground.
+          const b = clamp01((p - NYC_BREAK_START - pc.breakDelay) / NYC_BREAK_SPAN);
+          if (b > 0) {
+            x += pc.sx * b;
+            z += pc.sz * b;
+            y += pc.sy * b - 48 * b * b;
+            rx += pc.rx * b;
+            ry += pc.ry * b;
+            rz += pc.rz * b;
+            scale *= 1 - smoothstep(0.55, 1, b);
+            lit *= 1 - smoothstep(0, 0.35, b);
+          }
+        } else {
+          // Denver: whole buildings rise out of the ground, then light up.
+          const r = clamp01((p - DEN_RISE_START - pc.introDelay) / 0.26);
+          const k = easeOutCubic(r);
+          y -= (1 - k) * (pc.buildingTop + 2);
+          scale = r > 0 ? 1 : 0;
+          lit = smoothstep(0.5, 1, r);
+        }
+
+        aLit[i] = lit;
+        e.set(rx, ry, rz);
+        q.setFromEuler(e);
+        v.set(x, y, z);
+        const k = Math.max(scale, 0.0001);
+        s.set(pc.w * k, pc.h * k, pc.d * k);
+        m.compose(v, q, s);
+        buildings.setMatrixAt(i, m);
+      }
+      buildings.instanceMatrix.needsUpdate = true;
+      litAttr.needsUpdate = true;
+
+      for (const range of ranges) {
+        const k = easeOutCubic(smoothstep(range.phase[0], range.phase[1], p));
+        range.mesh.position.y = -(range.maxH + 8) * (1 - k);
+        range.mesh.visible = k > 0;
+      }
+    }
+
+    // ---------- Loop ----------
+    const startTime = performance.now();
+    const skipIntro = reducedMotion || pinnedP !== null;
+    let lastFrame = startTime;
+    let lastRenderedP = -1;
+    let introDone = false;
+
+    function frame(now: number) {
+      const dt = Math.min(0.1, (now - lastFrame) / 1000);
+      lastFrame = now;
+      const introTime = pinnedT ?? (skipIntro ? 1000 : (now - startTime) / 1000);
+      if (reducedMotion) {
+        progress = targetP; // jump between scenes, no in-between animation
+      } else {
+        progress += (targetP - progress) * Math.min(1, dt * 6);
+        if (Math.abs(targetP - progress) < 0.0005) progress = targetP;
+      }
+
+      const introRunning = introTime < 6;
+      const changed = introRunning || !introDone || progress !== lastRenderedP;
+      // Stars twinkle every frame; buildings and ranges only update when something moved.
+      if (!reducedMotion || changed) {
+        starMat.uniforms.uTime.value = reducedMotion ? 0 : now / 1000;
+        if (changed) update(introTime, progress);
+        renderer!.render(scene, camera);
+        lastRenderedP = progress;
+        if (!introRunning) introDone = true;
+      }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+</script>

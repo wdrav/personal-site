@@ -1,16 +1,20 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import SkylineScene from "../components/SkylineScene.astro";
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 ---
 
 <Layout title="Will — Developer & Data Analyst">
+  <SkylineScene slot="background" />
+
   <!-- Navigation -->
   <nav>
     <div class="container">
       <a href={base} class="logo">will.</a>
       <ul class="nav-links">
-        <li><a href="#about">About</a></li>      </ul>
+        <li><a href="#about">About</a></li>
+      </ul>
     </div>
   </nav>
 
@@ -18,7 +22,6 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
   <section class="hero" id="about">
     <div class="container">
       <div class="hero-content">
-        <p class="label reveal">Hello, I'm</p>
         <h1 class="reveal">
           Will
         </h1>
@@ -38,6 +41,9 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
       <div class="arrow"></div>
     </div>
   </section>
+
+  <!-- Scroll room for the background: New York breaks apart, Denver rises -->
+  <div class="scene-scroll" data-scene-scroll aria-hidden="true"></div>
 
   <!-- Footer -->
   <footer class="reveal">

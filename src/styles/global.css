@@ -243,26 +243,6 @@ nav .nav-links a:hover::after {
   max-width: 640px;
 }
 
-.hero .label {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.hero .label::before {
-  content: "";
-  display: inline-block;
-  width: 2rem;
-  height: 1px;
-  background: var(--accent);
-}
-
 .hero h1 {
   font-size: clamp(2.5rem, 5vw, 3.75rem);
   font-weight: 700;
@@ -584,4 +564,14 @@ footer p {
   .scroll-indicator .arrow::after {
     animation: none;
   }
+}
+
+/* ===== Background scene scroll room ===== */
+.scene-scroll {
+  height: 220vh;
+}
+
+/* Keep hero text readable over the skyline */
+.hero-content {
+  text-shadow: 0 1px 14px rgba(6, 7, 11, 0.95), 0 0 4px rgba(6, 7, 11, 0.8);
 }
