@@ -271,11 +271,6 @@ nav .nav-links a:hover::after {
   margin-bottom: 1.5rem;
 }
 
-.hero h1 span {
-  color: var(--text-muted);
-  font-weight: 400;
-}
-
 .hero .bio {
   font-size: 1.1rem;
   color: var(--text-muted);
@@ -289,7 +284,11 @@ nav .nav-links a:hover::after {
   gap: 1.5rem;
 }
 
-.hero .links a {
+.hero .links a,
+.hero .links button {
+  background: none;
+  border: none;
+  cursor: pointer;
   font-family: var(--font-mono);
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -299,11 +298,17 @@ nav .nav-links a:hover::after {
   transition: color 0.3s, border-color 0.3s, transform 0.3s;
 }
 
-.hero .links a:hover {
+.hero .links a:hover,
+.hero .links button:hover {
   color: var(--text);
   border-color: var(--accent);
   opacity: 1;
   transform: translateY(-2px);
+}
+
+.hero .links button.copied {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 /* Scroll indicator */
@@ -385,98 +390,6 @@ nav .nav-links a:hover::after {
 
 .section-header.visible::after {
   transform: scaleX(1);
-}
-
-/* ===== Blog Section ===== */
-.blog-grid {
-  display: grid;
-  gap: 1px;
-  background: var(--line);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.blog-card {
-  background: var(--bg);
-  padding: 2rem;
-  transition: background 0.4s, box-shadow 0.4s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-}
-
-.blog-card::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--accent);
-  transform: scaleY(0);
-  transform-origin: bottom;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.blog-card:hover {
-  background: var(--bg-surface);
-  box-shadow: inset 0 0 60px var(--accent-glow);
-}
-
-.blog-card:hover::before {
-  transform: scaleY(1);
-}
-
-.blog-card .date {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  letter-spacing: 0.05em;
-  margin-bottom: 0.75rem;
-}
-
-.blog-card h3 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  letter-spacing: -0.01em;
-}
-
-.blog-card h3 a {
-  color: var(--text);
-  transition: color 0.3s;
-}
-
-.blog-card h3 a:hover {
-  color: var(--accent);
-  opacity: 1;
-}
-
-.blog-card p {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  line-height: 1.6;
-}
-
-.blog-card .tags {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  flex-wrap: wrap;
-}
-
-.blog-card .tag {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--accent);
-  background: var(--accent-dim);
-  padding: 0.2rem 0.6rem;
-  border-radius: 2px;
-  letter-spacing: 0.03em;
-  transition: background 0.3s;
-}
-
-.blog-card:hover .tag {
-  background: rgba(94, 187, 247, 0.25);
 }
 
 /* ===== Projects Section ===== */
@@ -597,41 +510,6 @@ nav .nav-links a:hover::after {
   color: var(--accent);
   opacity: 1;
   transform: translateX(4px);
-}
-
-/* ===== Coming Soon Placeholder ===== */
-.coming-soon {
-  border: 1px dashed var(--line-bright);
-  border-radius: 4px;
-  padding: 3.5rem 2.5rem;
-  text-align: center;
-}
-
-.coming-soon-title {
-  font-family: var(--font-mono);
-  font-size: 1.1rem;
-  color: var(--accent);
-  margin-bottom: 1rem;
-  letter-spacing: -0.01em;
-}
-
-.coming-soon-text {
-  font-size: 0.95rem;
-  color: var(--text-muted);
-  line-height: 1.7;
-  max-width: 480px;
-  margin: 0 auto;
-}
-
-.coming-soon-text a {
-  color: var(--accent);
-  border-bottom: 1px solid var(--line);
-  transition: border-color 0.3s;
-}
-
-.coming-soon-text a:hover {
-  border-color: var(--accent);
-  opacity: 1;
 }
 
 /* ===== Footer ===== */

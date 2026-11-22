@@ -1,17 +1,16 @@
 ---
 import Layout from "../layouts/Layout.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 ---
 
 <Layout title="Will — Developer & Data Analyst">
   <!-- Navigation -->
   <nav>
     <div class="container">
-      <a href="/" class="logo">will.</a>
+      <a href={base} class="logo">will.</a>
       <ul class="nav-links">
-        <li><a href="#about">About</a></li>
-        <li><a href="#blog">Blog</a></li>
-        <li><a href="#projects">Projects</a></li>
-      </ul>
+        <li><a href="#about">About</a></li>      </ul>
     </div>
   </nav>
 
@@ -22,60 +21,21 @@ import Layout from "../layouts/Layout.astro";
         <p class="label reveal">Hello, I'm</p>
         <h1 class="reveal">
           Will
-          <br />
-          <span>Developer & Data Analyst</span>
         </h1>
         <p class="bio reveal">
-          CS graduate who pivoted into data analytics. Book reader, sleepless
-          builder, weight lifter, skiier, permanent underclass escaper. Add me
-          on LinkedIn to get in touch.
+          Developer. Data Analyst. Always curious.
         </p>
         <div class="links reveal">
           <a href="https://github.com/wdrav" target="_blank" rel="noopener">GitHub</a>
           <a href="https://www.linkedin.com/in/wdrav/" target="_blank" rel="noopener">LinkedIn</a>
+          <button type="button" class="copy-email" data-user="will.dravenstott" data-domain="gmail.com" aria-live="polite">email</button>
+          <a href={`${base}resume.pdf`} target="_blank" rel="noopener">resume</a>
         </div>
       </div>
     </div>
     <div class="scroll-indicator">
       <span>Scroll</span>
       <div class="arrow"></div>
-    </div>
-  </section>
-
-  <!-- Blog -->
-  <section id="blog">
-    <div class="container">
-      <div class="section-header reveal">
-        <h2>Blog</h2>
-      </div>
-
-      <div class="coming-soon reveal">
-        <p class="coming-soon-title">Coming soon</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- Projects -->
-  <section id="projects">
-    <div class="container">
-      <div class="section-header reveal">
-        <h2>Projects</h2>
-      </div>
-
-      <div class="projects-grid stagger">
-        <a href="/personal-site/three-body/" class="project-card reveal">
-          <p class="project-label">Simulation</p>
-          <h3>Three Body Visualization</h3>
-          <p>
-            A real-time 3D simulation of three gravitationally interacting
-            bodies, with colored trails tracing their orbital paths.
-          </p>
-          <div class="tech">
-            <span>JavaScript</span>
-            <span>Canvas</span>
-          </div>
-        </a>
-      </div>
     </div>
   </section>
 
@@ -102,4 +62,46 @@ import Layout from "../layouts/Layout.astro";
 
   document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
   document.querySelectorAll(".section-header").forEach((el) => observer.observe(el));
+
+  // Copy email to clipboard. The address is assembled at click time so it
+  // isn't sitting in the HTML as plain text for scrapers.
+  const emailButton = document.querySelector<HTMLButtonElement>(".copy-email");
+  if (emailButton) {
+    const label = emailButton.textContent;
+    let resetTimer: number | undefined;
+
+    const copyFallback = (text: string) => {
+      const field = document.createElement("textarea");
+      field.value = text;
+      field.setAttribute("readonly", "");
+      field.style.position = "fixed";
+      field.style.opacity = "0";
+      document.body.appendChild(field);
+      field.select();
+      const ok = document.execCommand("copy");
+      field.remove();
+      return ok;
+    };
+
+    emailButton.addEventListener("click", async () => {
+      const email = `${emailButton.dataset.user}@${emailButton.dataset.domain}`;
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(email);
+        copied = true;
+      } catch {
+        copied = copyFallback(email);
+      }
+      // If copying failed, show the address so it can be copied by hand.
+      emailButton.textContent = copied ? "Copied!" : email;
+      emailButton.classList.toggle("copied", copied);
+      window.clearTimeout(resetTimer);
+      if (copied) {
+        resetTimer = window.setTimeout(() => {
+          emailButton.textContent = label;
+          emailButton.classList.remove("copied");
+        }, 2000);
+      }
+    });
+  }
 </script>
