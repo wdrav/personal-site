@@ -1,6 +1,7 @@
-// Section glide: scrolling stays native, but once the page comes to rest it
-// eases onto the next section in the direction you were scrolling (or back to
-// the one you barely left). Any new input cancels the glide immediately.
+// Section glide: scrolling stays fully native. Only after the page has been
+// still for a moment, and only if it stopped close to a section, does it ease
+// the last few steps onto that section. Stop anywhere else and it stays put.
+// Any new input cancels the glide immediately.
 //
 // A stop is a scroll position. A stop with `bottom` is a section taller than
 // the screen: anywhere between `top` and `bottom` is left alone so it can be
@@ -8,10 +9,10 @@
 
 export type Stop = { top: number; bottom?: number };
 
-const IDLE_MS = 140; // quiet time after the last scroll event before gliding
-const NUDGE = 4; // px of movement that counts as "you scrolled"
+const IDLE_MS = 450; // quiet time after the last scroll event before gliding
+const REACH = 0.3; // only settle onto a stop within this fraction of the screen height
 
-const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const easeInOutSine = (t: number) => -(Math.cos(Math.PI * t) - 1) / 2;
 
 export function sectionGlide(getStops: () => Stop[]) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -40,14 +41,14 @@ export function sectionGlide(getStops: () => Stop[]) {
       rest = y;
       return;
     }
-    const duration = Math.min(1100, Math.max(550, 450 + Math.abs(dist) * 0.3));
+    const duration = Math.min(1000, Math.max(600, 500 + Math.abs(dist) * 0.8));
     const start = performance.now();
     gliding = true;
     // The site sets `scroll-behavior: smooth`; per-frame scrolling needs it off.
     root.style.scrollBehavior = "auto";
     const step = (now: number) => {
       const t = Math.min(1, (now - start) / duration);
-      window.scrollTo(0, from + dist * easeInOutCubic(t));
+      window.scrollTo(0, from + dist * easeInOutSine(t));
       if (t < 1) {
         frame = requestAnimationFrame(step);
       } else {
@@ -73,23 +74,16 @@ export function sectionGlide(getStops: () => Stop[]) {
       return;
     }
 
-    const points = [...new Set([0, maxScroll(), ...stops.flatMap((s) => [s.top, s.bottom])])].sort((a, b) => a - b);
-    const moved = y - rest;
-    let target: number;
-
-    if (Math.abs(moved) < NUDGE) {
-      // No real movement since the last rest: just settle on the nearest stop.
-      target = points.reduce((best, p) => (Math.abs(p - y) < Math.abs(best - y) ? p : best), points[0]);
-    } else if (moved > 0) {
-      const ahead = points.find((p) => p >= y) ?? maxScroll();
-      const behind = [...points].reverse().find((p) => p < y);
-      // If momentum already carried you past a stop, take whichever is closer.
-      target = behind !== undefined && behind > rest + NUDGE && y - behind < ahead - y ? behind : ahead;
-    } else {
-      const ahead = [...points].reverse().find((p) => p <= y) ?? 0;
-      const behind = points.find((p) => p > y);
-      target = behind !== undefined && behind < rest - NUDGE && behind - y < y - ahead ? behind : ahead;
+    const points = [...new Set([0, maxScroll(), ...stops.flatMap((s) => [s.top, s.bottom])])];
+    // Only ever carry you onward, in the direction you were scrolling; never
+    // pull you back against it.
+    const reach = window.innerHeight * REACH;
+    const ahead = points.filter((p) => (p - y) * lastDir >= 0 && Math.abs(p - y) <= reach);
+    if (!ahead.length) {
+      rest = y; // stopped between sections: leave it there
+      return;
     }
+    const target = ahead.reduce((best, p) => (Math.abs(p - y) < Math.abs(best - y) ? p : best));
 
     glideTo(target);
   }
@@ -99,7 +93,12 @@ export function sectionGlide(getStops: () => Stop[]) {
     idleTimer = window.setTimeout(settle, IDLE_MS);
   };
 
+  let lastY = window.scrollY;
+  let lastDir = 1;
   window.addEventListener("scroll", () => {
+    const y = window.scrollY;
+    if (y !== lastY && !gliding) lastDir = y > lastY ? 1 : -1;
+    lastY = y;
     if (!gliding) schedule();
   }, { passive: true });
 

@@ -581,23 +581,6 @@ const iconLabel: Record<Icon, string> = {
 </style>
 
 <script>
-  import { sectionGlide } from "../scripts/sectionGlide";
-
-  // Glide one stop at a time: intro, each card centred below the nav, the end.
-  // A card taller than the screen is read freely between its top and bottom.
-  sectionGlide(() => {
-    const navH = document.querySelector("nav")?.getBoundingClientRect().height ?? 0;
-    const vh = window.innerHeight;
-    const room = vh - navH - 32;
-    const stops = Array.from(document.querySelectorAll<HTMLElement>("[data-stop]")).map((card) => {
-      const r = card.getBoundingClientRect();
-      const top = r.top + window.scrollY;
-      if (r.height <= room) return { top: top + r.height / 2 - (vh + navH) / 2 };
-      return { top: top - navH - 16, bottom: top + r.height - vh + 16 };
-    });
-    return [{ top: 0 }, ...stops, { top: Number.MAX_SAFE_INTEGER }];
-  });
-
   // Draws the trail to fit the cards: a dotted route winding from the top of
   // the run past each stop, solid "tracks" that fill in as you scroll, a marker
   // per stop, and line-art trees in the open space beside the trail.
