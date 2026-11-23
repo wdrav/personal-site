@@ -626,6 +626,21 @@ footer p {
   background: rgba(18, 18, 26, 0.8);
 }
 
+/* Denver section: sits in the sky once the city has risen */
+.scene-scroll .coming-soon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 56vh;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  color: var(--text-muted);
+  text-shadow: 0 1px 12px rgba(6, 7, 11, 0.95);
+}
+
 /* Keep hero text readable over the skyline */
 .hero-content {
   text-shadow: 0 1px 14px rgba(6, 7, 11, 0.95), 0 0 4px rgba(6, 7, 11, 0.8);
