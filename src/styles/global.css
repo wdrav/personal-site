@@ -568,7 +568,7 @@ footer p {
 
 /* ===== Background scene scroll room ===== */
 .scene-scroll {
-  height: 220vh;
+  height: 330vh; /* New York, Boulder, then Denver */
 }
 
 /* Keep hero text readable over the skyline */

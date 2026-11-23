@@ -46,20 +46,32 @@
     Vector3,
     WebGLRenderer,
     DynamicDrawUsage,
+    Group,
+    Shape,
+    ShapeGeometry,
   } from "three";
+  import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
+  import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
+  import { LineMaterial } from "three/addons/lines/LineMaterial.js";
 
   // ---------- Tunables ----------
   const FOG_COLOR: [number, number, number] = [0.078, 0.08, 0.108]; // matches the CSS sky near the horizon
   const FOG_NEAR = 110;
   const FOG_FAR = 420;
   const INTRO_PIECE_DURATION = 0.6; // seconds each block takes to land
+  // Scroll timeline (progress 0..1): New York -> Boulder -> Denver.
   const NYC_BREAK_START = 0.03; // progress where New York starts falling apart
-  const NYC_BREAK_SPAN = 0.3; // how long each block takes to fall
-  const DEN_RISE_START = 0.5; // progress where downtown Denver starts rising
+  const NYC_BREAK_SPAN = 0.18; // how long each block takes to fall
+  const NYC_BREAK_STAGGER = 0.55; // shrinks the per-block delays so New York clears by ~0.4
+  const BOULDER_RISE = 0.27; // the Flatirons rise
+  const BOULDER_SINK = 0.6; // ...and sink back down before Denver
+  const BOULDER_SPAN = 0.15;
+  const DEN_RISE_START = 0.7; // progress where downtown Denver starts rising
+  const DEN_RISE_SPAN = 0.2;
   const MOUNTAIN_PHASES: [number, number][] = [
-    [0.15, 0.6], // far range
-    [0.22, 0.68], // middle range
-    [0.3, 0.75], // foothills
+    [0.22, 0.48], // far range (behind Boulder and Denver)
+    [0.3, 0.55], // middle range
+    [0.64, 0.86], // foothills (Denver)
   ];
 
   ColorManagement.enabled = false; // all colors below are authored as-is
@@ -191,7 +203,7 @@
         // assemble left to right, bottom to top
         introDelay: 0.15 + ((x + 80) / 160) * 1.3 + i * 0.045 + rand() * 0.15,
         // tops crumble first
-        breakDelay: (1 - level) * 0.14 + rand() * 0.12 + ((x + 80) / 160) * 0.06,
+        breakDelay: ((1 - level) * 0.14 + rand() * 0.12 + ((x + 80) / 160) * 0.06) * NYC_BREAK_STAGGER,
       });
     });
   }
@@ -584,6 +596,146 @@
     makeRange(-145, (x) => 9 + 13 * fbm(x / 26, 5), [0.11, 0.13, 0.21], [0.44, 0.48, 0.58], 20, MOUNTAIN_PHASES[1]);
     makeRange(-80, (x) => 3 + 9 * fbm(x / 15, 9), [0.05, 0.06, 0.1], null, 0, MOUNTAIN_PHASES[2]);
 
+    // --- Boulder: the Flatirons, in clean line art ---
+    // Five sandstone slabs on the face of Green Mountain, seen from town looking
+    // west (so north, the First Flatiron, is on the right). Drawn as outlines
+    // over dark cutout fills; they rise in front of the ranges, hold, then sink
+    // before Denver comes up. By then the hero text has scrolled away, so they
+    // can fill most of the screen.
+    type Rising = { obj: Group; height: number; delay: number; lines: LineMaterial[] };
+    const boulderGroups: Rising[] = [];
+    const lineMats: LineMaterial[] = []; // need the screen size on resize
+    const boulderRoot = new Group();
+    boulderRoot.scale.setScalar(2.3);
+    boulderRoot.position.set(22, 0, -34);
+    scene.add(boulderRoot);
+
+    // Screen-space lines with a real width (plain WebGL lines are always 1px).
+    function lines(segments: number[], color: number, width: number, opacity: number) {
+      const geo = new LineSegmentsGeometry();
+      geo.setPositions(segments);
+      const mat = new LineMaterial({ color, linewidth: width, transparent: true, opacity, depthWrite: false });
+      mat.userData.baseOpacity = opacity;
+      lineMats.push(mat);
+      const obj = new LineSegments2(geo, mat);
+      obj.computeLineDistances();
+      return { obj, mat };
+    }
+    // Outline through 2D points, at depth z. Skips the first edge (a slab's
+    // base) so the rock looks like it continues into the ground.
+    const outlineAbove = (pts: [number, number][], z = 0) => {
+      const seg: number[] = [];
+      for (let k = 1; k < pts.length; k++) {
+        const a = pts[k];
+        const b = pts[(k + 1) % pts.length];
+        seg.push(a[0], a[1], z, b[0], b[1], z);
+      }
+      return seg;
+    };
+    const fill = (pts: [number, number][], color: number) => {
+      const shape = new Shape();
+      pts.forEach(([x, y], k) => (k === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y)));
+      shape.closePath();
+      return new Mesh(new ShapeGeometry(shape), new MeshBasicMaterial({ color }));
+    };
+
+    const MUTED = 0x8888a0;
+    const ACCENT = 0x73c2fa;
+
+    // Green Mountain: a dark silhouette with a single muted ridgeline.
+    {
+      const ridge: [number, number][] = [];
+      for (let x = -120; x <= 70; x += 2) {
+        ridge.push([x, -4 + 25 * gauss(x, -8, 24) + 8 * gauss(x, -50, 15) + 1.5 * noise1(x / 4, 11)]);
+      }
+      const silhouette: [number, number][] = [[-120, -10], ...ridge, [70, -10]];
+      const g = new Group();
+      g.add(fill(silhouette, 0x0f1117));
+      const seg: number[] = [];
+      for (let k = 0; k < ridge.length - 1; k++) seg.push(ridge[k][0], ridge[k][1], 0.05, ridge[k + 1][0], ridge[k + 1][1], 0.05);
+      const l = lines(seg, MUTED, 1.2, 0.55);
+      g.add(l.obj);
+      g.position.z = -20;
+      boulderRoot.add(g);
+      boulderGroups.push({ obj: g, height: 40, delay: 0, lines: [l.mat] });
+    }
+
+    // The slabs: accent outline, dark fill, and fine ridge lines that run up
+    // the rock and converge toward the tip.
+    {
+      const H = 0.82; // overall height factor
+      const slabs = [
+        { name: "Fifth", x: -42, b: 10, h: 11, ridges: 3, pts: [[-0.5, 0], [0.5, 0], [0.24, 0.6], [0.06, 1], [-0.2, 0.75], [-0.4, 0.3]] },
+        { name: "Fourth", x: -30, b: 12, h: 16, ridges: 4, pts: [[-0.5, 0], [0.5, 0], [0.3, 0.45], [0.16, 0.62], [0.08, 1], [-0.14, 0.82], [-0.38, 0.35]] },
+        { name: "Third", x: -15.5, b: 14, h: 30, ridges: 6, pts: [[-0.5, 0], [0.5, 0], [0.24, 0.55], [0.06, 1], [-0.1, 0.9], [-0.3, 0.52]] },
+        { name: "Second", x: -1, b: 11, h: 17, ridges: 4, pts: [[-0.5, 0], [0.5, 0], [0.32, 0.5], [0.14, 0.86], [0.03, 0.78], [-0.08, 1], [-0.3, 0.6], [-0.45, 0.2]] },
+        { name: "First", x: 14, b: 16, h: 31, ridges: 7, pts: [[-0.5, 0], [0.5, 0], [0.38, 0.3], [0.2, 0.7], [0.06, 1], [-0.08, 0.95], [-0.3, 0.55], [-0.42, 0.25]] },
+      ];
+      slabs.forEach((sl, i) => {
+        const h = sl.h * H;
+        const pts = sl.pts.map(([px, py]) => [sl.x + px * sl.b, py * h] as [number, number]);
+        const apex = pts.reduce((a, b) => (b[1] > a[1] ? b : a));
+        const g = new Group();
+        g.add(fill(pts, 0x0c0d13));
+        const outline = lines(outlineAbove(pts, 0.05), ACCENT, 1.6, 0.9);
+        // Ridge lines: from points along the base toward the apex, stopping short.
+        const seg: number[] = [];
+        for (let k = 1; k <= sl.ridges; k++) {
+          const bx = sl.x - sl.b / 2 + (sl.b * k) / (sl.ridges + 1);
+          const reach = 0.55 + 0.3 * Math.sin(k * 2.3 + i) ** 2;
+          // Start just above the tree line so the forest stays uncluttered.
+          const start = 3.6 / apex[1];
+          seg.push(
+            bx + (apex[0] - bx) * start, apex[1] * start, 0.04,
+            bx + (apex[0] - bx) * reach, apex[1] * reach, 0.04,
+          );
+        }
+        const ridgeLines = lines(seg, MUTED, 1, 0.5);
+        g.add(outline.obj, ridgeLines.obj);
+        boulderRoot.add(g);
+        boulderGroups.push({ obj: g, height: h + 2, delay: 0.012 * i, lines: [outline.mat, ridgeLines.mat] });
+      });
+    }
+
+    // A row of small outlined pines with white tips along the foot of the slabs.
+    // Dark fills keep the slab lines from showing through them.
+    {
+      const r = mulberry32(77);
+      const seg: number[] = [];
+      const bodies: Shape[] = [];
+      const tips: Shape[] = [];
+      const tri = (a: [number, number], b: [number, number], c: [number, number]) => {
+        const sh = new Shape();
+        sh.moveTo(...a);
+        sh.lineTo(...b);
+        sh.lineTo(...c);
+        sh.closePath();
+        return sh;
+      };
+      for (let x = -70; x <= 50; x += 1.1 + r() * 1.6) {
+        const size = 0.55 + r() * 0.7;
+        const w = 0.85 * size;
+        const top = 1.2 + size * 1.5;
+        const base = -0.2 + r() * 0.3;
+        seg.push(x - w, base, 0, x, top, 0, x, top, 0, x + w, base, 0);
+        bodies.push(tri([x - w, base], [x + w, base], [x, top]));
+        const capY = top - (top - base) * 0.2;
+        const capW = w * 0.22;
+        tips.push(tri([x - capW, capY], [x + capW, capY], [x, top]));
+      }
+      const g = new Group();
+      g.add(fill([[-75, -3], [55, -3], [55, 0.1], [-75, 0.1]], 0x0a0b10));
+      g.add(new Mesh(new ShapeGeometry(bodies), new MeshBasicMaterial({ color: 0x0c0d13 })));
+      const tipMesh = new Mesh(new ShapeGeometry(tips), new MeshBasicMaterial({ color: 0xe8e8ec }));
+      tipMesh.position.z = 0.03;
+      const l = lines(seg, MUTED, 1, 0.6);
+      l.obj.position.z = 0.02;
+      g.add(l.obj, tipMesh);
+      g.position.z = 4;
+      boulderRoot.add(g);
+      boulderGroups.push({ obj: g, height: 5, delay: 0.02, lines: [l.mat] });
+    }
+
     // --- Stars ---
     const starCount = 700;
     const starPos = new Float32Array(starCount * 3);
@@ -666,8 +818,8 @@
       if (!scrollEl) return 0;
       const end = scrollEl.getBoundingClientRect().bottom + window.scrollY - window.innerHeight;
       const p = end > 0 ? clamp01(window.scrollY / end) : 0;
-      // With reduced motion, swap scenes at the halfway point instead of animating.
-      return reducedMotion ? (p < 0.5 ? 0 : 1) : p;
+      // With reduced motion, jump between New York, Boulder and Denver instead of animating.
+      return reducedMotion ? (p < 0.33 ? 0 : p < 0.66 ? 0.5 : 1) : p;
     }
 
     let targetP = readProgress();
@@ -688,6 +840,7 @@
       renderer!.setPixelRatio(dpr);
       renderer!.setSize(w, h, false);
       starMat.uniforms.uPixelRatio.value = dpr;
+      for (const mat of lineMats) mat.resolution.set(w, h);
       const aspect = w / h;
       camera.aspect = aspect;
       // Keep at least ~64 units of skyline in view on narrow (portrait) screens.
@@ -745,7 +898,7 @@
           }
         } else {
           // Denver: whole buildings rise out of the ground, then light up.
-          const r = clamp01((p - DEN_RISE_START - pc.introDelay) / 0.26);
+          const r = clamp01((p - DEN_RISE_START - pc.introDelay) / DEN_RISE_SPAN);
           const k = easeOutCubic(r);
           y -= (1 - k) * (pc.buildingTop + 2);
           scale = r > 0 ? 1 : 0;
@@ -769,6 +922,20 @@
         range.mesh.position.y = -(range.maxH + 8) * (1 - k);
         range.mesh.visible = k > 0;
       }
+
+      for (const b of boulderGroups) {
+        const k = boulderAmount(p, b.delay);
+        b.obj.position.y = -(b.height + 4) * (1 - k);
+        b.obj.visible = k > 0;
+        for (const l of b.lines) l.opacity = l.userData.baseOpacity * smoothstep(0.5, 1, k);
+      }
+    }
+
+    // How far Boulder has risen (0..1): up after New York falls, down before Denver.
+    function boulderAmount(p: number, delay: number) {
+      const up = easeOutCubic(clamp01((p - BOULDER_RISE - delay) / BOULDER_SPAN));
+      const down = clamp01((p - BOULDER_SINK - delay) / BOULDER_SPAN);
+      return up * (1 - down * down * (3 - 2 * down));
     }
 
     // ---------- Loop ----------
