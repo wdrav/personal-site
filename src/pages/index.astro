@@ -123,6 +123,21 @@ const projects = [
 </Layout>
 
 <script>
+  import { sectionGlide } from "../scripts/sectionGlide";
+
+  // Glide between the three scenes: New York (intro), Boulder (projects), Denver (end).
+  // On small screens the project cards can be taller than the screen; that
+  // stretch scrolls freely.
+  sectionGlide(() => {
+    const projects = document.querySelector<HTMLElement>("#projects");
+    if (!projects) return [{ top: 0 }, { top: Number.MAX_SAFE_INTEGER }];
+    const navH = document.querySelector("nav")?.getBoundingClientRect().height ?? 0;
+    const r = projects.getBoundingClientRect();
+    const top = r.top + window.scrollY - navH - window.innerHeight * 0.12; // sit a little below the nav
+    const bottom = r.bottom + window.scrollY - window.innerHeight + 24;
+    return [{ top: 0 }, bottom > top ? { top, bottom } : { top }, { top: Number.MAX_SAFE_INTEGER }];
+  });
+
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
