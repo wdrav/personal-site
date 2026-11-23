@@ -3,6 +3,45 @@ import Layout from "../layouts/Layout.astro";
 import SkylineScene from "../components/SkylineScene.astro";
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+
+const projects = [
+  {
+    label: "Startup · 2024–2025",
+    title: "Measures AI",
+    text: "Co-founded a Boulder startup that mined sales calls and emails for what drives deals. Built the NLP engine and React front end; raised $100K+.",
+    tech: ["Python", "Hugging Face", "React"],
+    links: [{ text: "measuresai.com", href: "https://measuresai.com" }],
+  },
+  {
+    label: "Open Source · CU Boulder",
+    title: "Excel2SBOL",
+    text: "A Python library that converts Excel templates into SBOL, the data standard for synthetic biology, so researchers can share designs without writing code.",
+    tech: ["Python", "SBOL", "PyPI"],
+    links: [
+      { text: "GitHub", href: "https://github.com/SynBioDex/Excel-to-SBOL" },
+      { text: "PyPI", href: "https://pypi.org/project/excel2sbol/" },
+    ],
+  },
+  {
+    label: "macOS App · Swift",
+    title: "Book Finder",
+    text: "A macOS menu bar app that finds free, legal EPUBs from Project Gutenberg, Standard Ebooks, Wikisource and the Internet Archive.",
+    tech: ["Swift", "SwiftUI"],
+    links: [{ text: "Download .zip", href: `${base}BookFinder.zip`, download: true }],
+  },
+  {
+    label: "Data Viz · Medium",
+    title: "Property Value & Restaurants",
+    text: "A visualization redesign clarifying how property values relate to restaurants, written up as a case study.",
+    tech: ["Data Viz", "Design"],
+    links: [
+      {
+        text: "Read the article",
+        href: "https://medium.com/@wdrav/final-individual-redesign-clarifying-the-relationship-between-property-value-and-restaurant-0b7e32a9e60c",
+      },
+    ],
+  },
+];
 ---
 
 <Layout title="Will — Developer & Data Analyst">
@@ -14,6 +53,7 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
       <a href={base} class="logo">will.</a>
       <ul class="nav-links">
         <li><a href="#about">About</a></li>
+        <li><a href="#projects">Projects</a></li>
         <li><a href={`${base}experience/`}>Experience</a></li>
       </ul>
     </div>
@@ -42,8 +82,36 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
     </div>
   </section>
 
-  <!-- Scroll room for the background: New York breaks apart, Denver rises -->
-  <div class="scene-scroll" data-scene-scroll aria-hidden="true"></div>
+  <!-- Scroll room for the background: New York breaks apart, Boulder rises
+       (projects sit here), then Denver -->
+  <div class="scene-scroll" data-scene-scroll>
+    <section class="projects" id="projects">
+      <div class="container">
+        <div class="section-header">
+          <h2>Projects</h2>
+        </div>
+        <div class="projects-grid">
+          {projects.map((p) => (
+            <article class="project-card reveal">
+              <span class="project-label">{p.label}</span>
+              <h3>{p.title}</h3>
+              <p>{p.text}</p>
+              <div class="tech">
+                {p.tech.map((t) => <span>{t}</span>)}
+              </div>
+              <div class="project-links">
+                {p.links.map((l) => (
+                  <a href={l.href} {...(l.download ? { download: "" } : { target: "_blank", rel: "noopener" })}>
+                    {l.text} →
+                  </a>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  </div>
 
   <!-- Footer -->
   <footer class="reveal">
